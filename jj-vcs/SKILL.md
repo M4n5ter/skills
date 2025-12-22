@@ -62,6 +62,16 @@ jj config set --repo git.fetch origin
 jj config set --repo git.push origin
 ```
 
+### 提交并推送（最常用流程）
+```bash
+jj status
+jj commit -m "message"
+jj bookmark set main -r @-
+jj git push --remote origin --bookmark main
+```
+- `jj commit` 会把工作区内容写入当前变更并创建一个新的空工作变更，所以需要用 `@-` 指向刚提交的那个变更。
+- 若使用其他分支名，替换 `main` 即可。
+
 ### 同步与推送
 ```bash
 jj git fetch --remote origin
