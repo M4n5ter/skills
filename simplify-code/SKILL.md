@@ -1,56 +1,90 @@
 ---
 name: "simplify-code"
-description: "Reviews changed files for reuse, code quality, and efficiency, then fixes concrete issues."
+description: "使用并行 subagent 从复用性、代码质量和效率角度审查变更代码，并直接修复具体清理问题。"
 ---
 
-# Simplify: Code Review and Cleanup
+# Simplify Code
 
-Review all changed files for reuse, quality, and efficiency. Fix any issues found.
+使用三个并行 subagent 审查变更代码，然后直接修复具体、低风险的问题。
 
-## Phase 1: Identify Changes
+成功标准：
+- 已从复用性、代码质量和有意义的效率问题三个角度检查变更文件
+- 只修复具体问题
+- 除非现有行为明显错误，否则保持行为不变
+- 最终 diff 尽量小
+- 执行相关验证，或说明无法执行验证的原因
 
-Run `git diff` or `git diff HEAD` if there are staged changes. If there are no git changes, review the most recently modified files that the user mentioned or that you edited earlier in this conversation.
+## 硬约束
 
-## Phase 2: Launch Three Review Agents In Parallel
+- 不要提交 commit。
+- 不要运行破坏性的 git 命令。
+- 不要格式化整个仓库。
+- 不要做猜测性重写或纯风格重构。
+- 不要让 subagent 修改文件。subagent 只审查；由父 agent 统一修复。
+- 跳过自动生成文件、第三方代码、构建产物和 lockfile，除非它们与本次问题直接相关。
 
-Launch all three agents concurrently. Pass each agent the full diff so each one sees the same context.
+## 步骤 1：识别审查目标
 
-### Agent 1: Code Reuse Review
+检查工作区：
 
-For each change:
+```bash
+git status --short
+git diff
+git diff --cached
+git ls-files --others --exclude-standard
+```
 
-1. Search for existing utilities and helpers that could replace newly written code.
-2. Flag any new function that duplicates existing functionality and point to the existing function.
-3. Flag inline logic that should use an existing utility instead of hand-rolled behavior.
+审查所有已变更的 tracked 文件，以及相关 untracked 文件。
 
-### Agent 2: Code Quality Review
+如果当前目录不是 git 仓库，则审查用户提到的文件，或本轮对话中最近编辑过的文件。
 
-Review the same changes for:
+## 步骤 2：并行启动审查 subagent
 
-1. redundant state
-2. parameter sprawl
-3. copy-paste with slight variation
-4. leaky abstractions
-5. stringly-typed code
-6. unnecessary JSX nesting
-7. unnecessary comments
+同时启动三个 subagent。把相关 diff 传给每个 subagent，并要求它们只返回具体发现：文件/符号位置、影响、建议修复。
 
-### Agent 3: Efficiency Review
+## Subagent A：复用性
 
-Review the same changes for:
+查找重复实现或手写逻辑，判断是否应该改用项目里已有的 utility、helper、hook、组件、类型、常量或约定。
 
-1. unnecessary work
-2. missed concurrency
-3. hot-path bloat
-4. recurring no-op updates
-5. unnecessary existence checks
-6. memory issues
-7. overly broad operations
+如果复用会降低可读性，或造成不合适的耦合，不要建议复用。
 
-## Phase 3: Fix Issues
+## Subagent B：代码质量
 
-Wait for all three agents to complete. Aggregate their findings and fix each issue directly.
+查找具体的可维护性问题，例如冗余状态、不必要抽象、复制粘贴变体、命名不清、已有强类型却使用字符串硬编码、抽象泄漏、没有充分理由的公共 API 变更。
 
-If a finding is a false positive or not worth addressing, note it briefly and move on.
+忽略主观风格偏好，除非它隐藏真实风险。
 
-When done, briefly summarize what was fixed, or confirm the code was already clean.
+## Subagent C：效率
+
+查找有实际意义的效率问题，例如重复昂贵计算、可安全并发却串行、热路径膨胀、不必要的 re-render/refetch/resubscription、过宽查询、低效循环、内存增长、反复 no-op 更新。
+
+忽略不会简化代码、也没有上下文意义的微优化。
+
+## 步骤 3：聚合并修复
+
+等待三个 subagent 都完成。
+
+然后：
+
+合并重复发现
+丢弃误报和低价值建议
+只应用局部、保持行为的修复
+优先沿用项目现有模式，而不是引入新抽象
+保持 diff 尽量小
+
+## 步骤 4：验证
+
+修改后检查最终 diff，并运行最相关的验证，例如 targeted test、typecheck、lint、build 或最小 smoke test。
+
+如果无法运行验证，说明原因。
+
+## 最终回复
+
+总结：
+
+- 审查了哪些文件
+- 修复了什么
+- 如有不明显的跳过项，说明跳过了什么
+- 执行了哪些验证命令及结果
+
+如果不需要修复，说明变更代码已经比较干净，并注明执行过的验证。
