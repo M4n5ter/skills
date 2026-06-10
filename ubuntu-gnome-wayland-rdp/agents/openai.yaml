@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ubuntu GNOME Wayland RDP"
+  short_description: "Set up and debug GNOME Wayland RDP on Ubuntu"
+  default_prompt: "Use $ubuntu-gnome-wayland-rdp to configure or troubleshoot Ubuntu GNOME Wayland Remote Login over RDP."
