@@ -20,7 +20,7 @@ description: 运行极其严格的可维护性审查，重点检查抽象质量�
 
 默认行为是只审查不修改。只有当用户明确要求修复或实现时才编辑文件。编辑时保持修复局部、行为保持不变、便于 review；不要格式化整个仓库；不要提交 commit；不要运行破坏性 git 命令；跳过生成文件、第三方代码、构建产物和 lockfile，除非它们与当前问题直接相关。
 
-只有当用户明确要求 subagents、delegation 或 parallel agent work 时才使用 subagents。否则本地完成审查。
+如果认为当前规模有必要使用 subagents 则选择相应工具生成 subagents。否则本地完成审查。
 
 ## 核心提示词
 
