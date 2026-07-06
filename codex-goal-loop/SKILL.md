@@ -1,157 +1,165 @@
 ---
 name: codex-goal-loop
-description: Explain and write effective instructions for OpenAI Codex's `/goal` feature — the persistent self-checking agent loop (plan → act → test → review → iterate). Use when the user mentions Codex `/goal`, "goal loop", "Ralph loop", wants to kick off a long-running autonomous Codex run, asks how to write a goal prompt, or wants a one-paragraph goal instruction drafted.
+description: 解释并编写 OpenAI Codex `/goal` 功能的有效指令——持久的自检代理循环（计划 → 执行 → 测试 → 复查 → 迭代）。当用户提到 Codex `/goal`、“goal loop”、“Ralph loop”，想启动一次长期运行的自主 Codex 任务，询问如何编写 goal 提示，或想草拟一段 goal 指令时使用。
 ---
 
-# Codex `/goal` Loop
+# Codex `/goal` 循环
 
-## What `/goal` is
+## 什么是 `/goal`
 
-`/goal` is a slash command in **Codex v0.128.0+** (April 30, 2026) that turns a Codex prompt into a **persistent agent** looping `plan → act → test → review → iterate` until a stop condition is met, the user pauses, or the token budget runs out. Internally called the "Ralph loop."
+`/goal` 是 **Codex v0.128.0+**（2026 年 4 月 30 日）中的一个斜杠命令，它会把一条 Codex 提示转化为一个**持久代理**，持续循环执行 `计划 → 执行 → 测试 → 复查 → 迭代`，直到满足停止条件、用户暂停，或 token 预算耗尽。内部称为 “Ralph loop”。
 
-Key difference from a normal prompt: when a turn ends but the goal isn't met, Codex **auto-continues** instead of waiting for input.
+它与普通提示的关键区别：当一个回合结束但目标尚未达成时，Codex 会**自动继续**，而不是等待用户输入。
 
-**Lifecycle states:** `pursuing`, `paused`, `achieved`, `unmet`, `budget-limited`.
+**生命周期状态：** `pursuing`、`paused`、`achieved`、`unmet`、`budget-limited`。
 
-When monitoring a running `/goal`, every check should include a one-line update to David: what Codex is doing and whether it is on track. Keep it extremely concise.
+监控正在运行的 `/goal` 时，每次检查都应向 M4n5ter 提供一行更新：Codex 正在做什么，以及是否按计划推进。保持极其简洁。
 
-**Not:** a budget command, a safety boundary, "run forever", or a replacement for `/plan`. It's a contract enforcer with a verification loop.
+**它不是：** 预算命令、安全边界、“永远运行”，也不是 `/plan` 的替代品。它是带验证循环的契约执行器。
 
-## Requirements
+## 要求
 
 - Codex CLI/app/extension v0.128.0+
-- `goals = true` in `~/.codex/config.toml` (or `codex features enable goals`)
-- **ChatGPT auth** (Plus/Pro/Business/Edu/Enterprise) — API-key auth does **not** work. Pro is the realistic minimum for long runs.
+- 在 `~/.codex/config.toml` 中设置 `goals = true`（或运行 `codex features enable goals`）
+- **ChatGPT 身份验证**（Plus/Pro/Business/Edu/Enterprise）——API key 身份验证不可用。对于长时间运行，Pro 是现实中的最低配置。
 
-## When to use it
+## 什么时候使用它
 
-Use only when **all three** are true:
-1. Task is >30 min of mechanical work.
-2. There's a **verifiable stop condition** (tests pass, coverage hit, eval ≥ X, build green).
-3. Repo is agent-ready (working build, decent tests, `AGENTS.md` present).
+仅当**以下三项全部满足**时使用：
 
-Fits: migrations, coverage lifts, TDD feature builds, refactors with contract tests, prompt/eval optimization, deploy retry loops, bug-repro-then-fix.
+1. 任务是超过 30 分钟的机械性工作。
+2. 有一个**可验证的停止条件**（测试通过、覆盖率达到目标、评测 ≥ X、构建变绿）。
+3. 仓库已适合代理执行（构建可用、测试较完善、存在 `AGENTS.md`）。
 
-Bad fits: exploratory work, vague "improve this", anything without a "done" definition, prod credentials, destructive shared-infra ops.
+适合：迁移、提升覆盖率、TDD 功能构建、带契约测试的重构、提示词/评测优化、部署重试循环、复现 bug 后修复。
 
-## The 5-part contract (every goal needs this)
+不适合：探索性工作、模糊的“改进这个”、任何没有“完成”定义的任务、生产凭证、破坏性的共享基础设施操作。
 
-1. **Objective** — one sentence, one concrete outcome.
-2. **Constraints** — what must NOT change (public API, files, libs, conventions).
-3. **Validation command** — the exact shell command that proves progress (`pytest -q`, `pnpm test`, etc.).
-4. **Stop condition** — verifiable: "Stop when X passes" OR "when further changes need human/product input."
-5. **Documentation** — one sentence instructing the agent to write concise, targeted docs for every change, either creating new `.md` files or updating existing ones.
+## 5 部分契约（每个 goal 都需要）
 
-Plus: tell Codex what to read first, ask it to work in checkpoints with a short progress log.
+1. **目标** —— 一句话，一个具体结果。
+2. **约束** —— 什么绝不能改变（公共 API、文件、库、约定）。
+3. **验证命令** —— 能证明进展的确切 shell 命令（`pytest -q`、`pnpm test` 等）。
+4. **停止条件** —— 可验证：“当 X 通过时停止”或“当进一步变更需要人工/产品输入时停止”。
+5. **文档** —— 用一句话指示代理为每项变更编写简洁、有针对性的文档，可以创建新的 `.md` 文件，也可以更新现有文档。
 
-## Writing a goal (the core deliverable)
+另外：告诉 Codex 首先阅读什么，要求它按检查点推进，并记录简短进度日志。
 
-When the user wants a quick `/goal` instruction, produce a structured markdown block with one line per contract item (proper newlines, not flowing prose). **Do not prefix the output with `/goal`** — David adds the slash command himself in the composer. Emit only the contract body. Template:
+## 编写 goal（核心交付物）
 
-```
-**Objective:** <one-sentence objective>
-**Read first:** <files/PLAN.md/issue>
-**Constraints:** <what not to change, libs, conventions>
-**Validate:** `<exact command>` after each change
-**Document:** Write concise, targeted documentation for all changes — create new `.md` files or update existing docs as needed.
-**Checkpoints:** work in checkpoints and log progress briefly
-**Stop when:** <verifiable condition>, OR when further changes require human/product input
-```
-
-### Example (migration)
+当用户想要一条快速的 `/goal` 指令时，生成一个结构化 markdown 块，每个契约项一行（使用正确换行，不要写成连续散文）。**不要在输出前加 `/goal`** —— M4n5ter 会自己在输入框中添加斜杠命令。只输出契约正文。模板：
 
 ```
-**Objective:** Migrate this project from Pydantic v1 to v2.
+**Objective:** <一句话目标>
+**Read first:** <文件/PLAN.md/issue>
+**Constraints:** <不要改变什么、库、约定>
+**Validate:** 每次变更后运行 `<确切命令>`
+**Document:** 为所有变更编写简洁、有针对性的文档——根据需要创建新的 `.md` 文件或更新现有文档。
+**Checkpoints:** 按检查点推进，并简短记录进度
+**Stop when:** <可验证条件>，或当进一步变更需要人工/产品输入时停止
+```
+
+### 示例（迁移）
+
+```
+**Objective:** 将此项目从 Pydantic v1 迁移到 v2。
 **Read first:** pyproject.toml, src/, tests/
-**Constraints:** no public API changes; keep imports backwards-compatible via shims if needed; no new dependencies
-**Validate:** `pytest -q` after each change
-**Checkpoints:** work in checkpoints; log progress briefly
-**Stop when:** full suite passes with zero deprecation warnings, OR when a change requires architecture decisions
+**Constraints:** 不改变公共 API；如有需要，通过 shim 保持导入向后兼容；不添加新依赖
+**Validate:** 每次变更后运行 `pytest -q`
+**Checkpoints:** 按检查点推进；简短记录进度
+**Stop when:** 完整测试套件通过且无任何弃用警告，或当某项变更需要架构决策时停止
 ```
 
-### Example (coverage lift)
+### 示例（提升覆盖率）
 
 ```
-**Objective:** Raise coverage in src/auth/ from ~38% to ≥75%.
+**Objective:** 将 src/auth/ 的覆盖率从约 38% 提高到 ≥75%。
 **Read first:** src/auth/, tests/auth/, AGENTS.md
-**Constraints:** no new deps; mirror existing test style; do not modify production code unless strictly required for testability
+**Constraints:** 不添加新依赖；遵循现有测试风格；除非严格出于可测试性需要，否则不要修改生产代码
 **Validate:** `pytest --cov=src/auth --cov-report=term-missing`
-**Checkpoints:** work in checkpoints; log coverage delta each one
-**Stop when:** coverage ≥75% AND all tests pass, OR when uncovered code needs design changes
+**Checkpoints:** 按检查点推进；每个检查点记录覆盖率变化
+**Stop when:** 覆盖率 ≥75% 且所有测试通过，或当未覆盖代码需要设计变更时停止
 ```
 
-### Writing rules
-- **One objective, one stop condition.** Not a backlog.
-- **Documentation is mandatory.** Every `/goal` prompt must include a single sentence committing the agent to concise, targeted docs — new `.md` files or focused updates to existing docs.
-- **Never instruct the agent to create new ADRs** — ADRs require David's explicit approval, so goal prompts must not pre-approve or encourage them.
-- **Forbid reward-hacking explicitly:** "Do not delete, skip, weaken, or narrow tests to make the goal pass." Otherwise Codex may game the stop condition.
-- **4,000-char limit** on the objective. If longer, put detail in a file (`PLAN.md`/`GOAL_BRIEF.md`) and make the goal point to it — keep the goal itself compact.
-- Use **literal strings** for paths, commands, issue numbers — exact.
-- Forbid scope creep explicitly: "Do not refactor unrelated code. Do not add dependencies."
-- Tell Codex when to pause: "If <condition>, pause and ask before proceeding."
-- Short, vague goals burn tokens for no extra value vs. a normal prompt.
+### 编写规则
 
-### Meta-prompting trick (highest-leverage)
+- **一个目标，一个停止条件。** 不要写成待办清单。
+- **文档是强制要求。** 每条 `/goal` 提示都必须包含一句话，要求代理编写简洁、有针对性的文档——可以创建新的 `.md` 文件，也可以有重点地更新现有文档。
+- **绝不要指示代理创建新的 ADR** —— ADR 需要 M4n5ter 明确批准，因此 goal 提示不得预先批准或鼓励创建 ADR。
+- **明确禁止 reward hacking：** “不要为了让目标通过而删除、跳过、削弱或缩小测试范围。” 否则 Codex 可能会钻停止条件的空子。
+- **目标长度限制为 4,000 个字符**。如果更长，把细节放入文件（`PLAN.md`/`GOAL_BRIEF.md`），并让 goal 指向该文件——goal 本身保持紧凑。
+- 对路径、命令、issue 编号使用**字面字符串**——必须精确。
+- 明确禁止范围蔓延：“不要重构无关代码。不要添加依赖。”
+- 告诉 Codex 何时暂停：“如果 <条件>，暂停并在继续前询问。”
+- 简短、模糊的 goal 相比普通提示不会带来额外价值，只会消耗 token。
 
-Hand-written goals under-specify. Ask a second AI session (Claude with the codebase loaded, ChatGPT with project connected, or a separate Codex thread in the same dir) to: (1) inspect the codebase, (2) surface hidden assumptions/constraints/edge cases, (3) emit a structured `/goal` markdown block using the 4-part contract. Paste that into Codex. Order-of-magnitude better runs.
+### 元提示技巧（最高杠杆）
 
-Claude Code cmux note: after Claude finishes, it may prefill a predicted next user message; that draft is Claude, not David speaking.
+手写 goal 往往规格不足。让另一个 AI 会话（加载了代码库的 Claude、连接了项目的 ChatGPT，或同一目录下的另一个 Codex 线程）执行以下操作：
 
-### Self-goal setting
+1. 检查代码库；
+2. 找出隐藏假设、约束和边界情况；
+3. 使用 4 部分契约输出一个结构化的 `/goal` markdown 块。
 
-Codex can now write and set its own goal natively (the `create_goal` tool). Instead of crafting the contract yourself, give it your high-level intent and tell it to set the goal: "Inspect this repo, then write yourself a `/goal` with a verifiable stop condition and pursue it." It's the meta-prompting trick done inline — the agent turns your intent into the contract. Still give it the same raw materials (files to read, constraints, the validation command) so the goal it writes is grounded. Add: "ask clarifying questions before committing if the intent is underspecified" — catches ambiguity up front and prevents the self-set goal from drifting.
+然后把它粘贴进 Codex。运行质量会提升一个数量级。
 
-## Launching
+Claude Code cmux 备注：Claude 完成后，可能会预填一条预测的下一条用户消息；那个草稿是 Claude 写的，不代表 M4n5ter 发言。
 
-1. `cd <repo>` (goals run scoped to the working directory).
-2. Run `codex` (bare — opens TUI). **Not** `codex exec "/goal ..."` — `/goal` is a TUI slash command only.
-3. Sign in with ChatGPT (not API key).
-4. Type `/goal <your contract>` in the composer, Enter.
-5. Walk away.
+### 自我设定 goal
 
-## Controlling a running goal
+Codex 现在可以原生编写并设置自己的 goal（`create_goal` 工具）。你无需自己编写契约，而是给它你的高层意图，并让它设置 goal：“检查这个仓库，然后为自己编写一个带有可验证停止条件的 `/goal` 并执行。” 这相当于把元提示技巧内联完成——代理会把你的意图转化为契约。仍然要给它相同的原始材料（要阅读的文件、约束、验证命令），这样它写出的 goal 才有依据。补充一句：“如果意图规格不足，在提交前先提出澄清问题”——这能提前捕捉歧义，防止自设 goal 偏移。
 
-| Command | Effect |
+## 启动
+
+1. `cd <repo>`（goal 的运行范围限定在当前工作目录）。
+2. 运行 `codex`（不带参数——打开 TUI）。**不要**运行 `codex exec "/goal ..."` —— `/goal` 只是 TUI 中的斜杠命令。
+3. 使用 ChatGPT 登录（不是 API key）。
+4. 在输入框中输入 `/goal <你的契约>`，然后回车。
+5. 离开去做别的事。
+
+## 控制正在运行的 goal
+
+| 命令 | 效果 |
 |---|---|
-| `/goal` (alone) | Status: current checkpoint, what's verified, what remains, blockers |
-| `/goal pause` | Freeze |
-| `/goal resume` | Unfreeze (required in v0.129+; paused goals never auto-resume) |
-| `/goal clear` | Kill the goal |
-| `/goal <new>` | Replace the current goal |
-| Ctrl+C / any typed message | Auto-pauses; user input always wins priority |
+| `/goal`（单独输入） | 查看状态：当前检查点、已验证内容、剩余事项、阻塞项 |
+| `/goal pause` | 冻结 |
+| `/goal resume` | 解除冻结（v0.129+ 中必需；暂停的 goal 永远不会自动恢复） |
+| `/goal clear` | 终止 goal |
+| `/goal <new>` | 替换当前 goal |
+| Ctrl+C / 任何输入的消息 | 自动暂停；用户输入始终拥有优先级 |
 
-Resuming across sessions: goal state is persisted server-side. `cd` back into the repo, run `codex`, `/goal` for status, `/goal resume`.
+跨会话恢复：goal 状态会在服务端持久化。重新 `cd` 进入仓库，运行 `codex`，输入 `/goal` 查看状态，再输入 `/goal resume`。
 
-Budget-limited state: Codex doesn't stop abruptly — it summarizes, notes what's left, saves state. `/goal resume` works after budget refresh or upgrade.
+预算受限状态：Codex 不会突然停止——它会总结、说明剩余事项，并保存状态。预算刷新或升级后，`/goal resume` 可继续使用。
 
-## When a goal drifts
+## 当 goal 发生偏移时
 
-- **Minor drift:** just type a correction in the composer (auto-pauses, folds it in, resumes).
-- **Loose objective:** `/goal pause`, read status, then `/goal <tighter version>` — replaces the contract. Don't pile instructions on a vague goal.
-- **Bad mess:** `/goal clear`, `git status` or `git stash`, rewrite with the meta-prompting trick, restart.
+- **轻微偏移：** 直接在输入框中输入修正（会自动暂停、合并修正，然后恢复）。
+- **目标过松：** `/goal pause`，阅读状态，然后输入 `/goal <更严格的版本>`——这会替换契约。不要在模糊 goal 上不断堆叠指令。
+- **严重混乱：** `/goal clear`，执行 `git status` 或 `git stash`，用元提示技巧重写，然后重新开始。
 
-Don't let a drifting goal keep running "to see where it goes." Tokens burn, diffs compound.
+不要让一个已经偏移的 goal 继续运行，只是“看看它会怎样”。这会消耗 token，并让 diff 不断叠加。
 
-## Operational tips
+## 操作建议
 
-- Inspect status periodically with bare `/goal`.
-- **Always review the diff** before merging — long autonomy means more code to validate, not less. Human oversight becomes more critical, not optional.
-- Keep approvals/sandboxing tight; default permissions are correct.
-- First run: pick a 30-min scoped task so you learn how `/goal` actually stops before trusting it overnight.
-- Bake recurring policy into `AGENTS.md` so every goal inherits it without restating: adversarial self-review before declaring done, an extra QA pass even when tests pass, and the standard validation command. Saves repeating it in each goal paragraph.
+- 定期用单独的 `/goal` 检查状态。
+- **合并前始终审查 diff** —— 长时间自主运行意味着需要验证的代码更多，而不是更少。人工监督会变得更关键，而不是可选。
+- 保持审批和沙箱设置严格；默认权限是正确的。
+- 第一次运行：选择一个约 30 分钟范围的任务，先了解 `/goal` 实际如何停止，再考虑让它隔夜运行。
+- 把经常重复的策略写入 `AGENTS.md`，这样每个 goal 都能继承它们，而不必重复说明：声明完成前进行对抗性自检、即使测试通过也额外做一次 QA、标准验证命令。这样可以减少每次 goal 段落中的重复内容。
 
-## Troubleshooting
+## 故障排查
 
-| Symptom | Fix |
+| 症状 | 修复 |
 |---|---|
-| `/goal` missing from slash popup | `codex update` (need ≥0.128.0) |
-| Flag on but command missing | Quit and restart `codex` fully |
-| Typed `/goals` | It's singular: `/goal` |
-| Doesn't activate | Sign out, sign back in with ChatGPT subscription (not API key) |
-| Stopped with progress summary | Budget-limited — `/goal resume` after refresh, or tighten scope |
-| `/goal resume` says no active goal | Terminal state or cleared — start fresh with `/goal <new>` |
-| Goal looks active but won't auto-continue | Stuck in Plan mode — plan-only work doesn't trigger continuation. Draft the plan, then switch to Goal execution |
+| 斜杠弹窗中没有 `/goal` | `codex update`（需要 ≥0.128.0） |
+| 功能标志已开启但命令缺失 | 完全退出并重启 `codex` |
+| 输入了 `/goals` | 它是单数：`/goal` |
+| 无法激活 | 退出登录，再使用 ChatGPT 订阅账号重新登录（不是 API key） |
+| 带进度总结停止 | 预算受限——刷新后运行 `/goal resume`，或收紧范围 |
+| `/goal resume` 提示没有活动 goal | 已进入终态或已清除——用 `/goal <new>` 重新开始 |
+| goal 看起来处于活动状态但不会自动继续 | 卡在 Plan 模式——仅计划工作不会触发继续。先起草计划，然后切换到 Goal 执行 |
 
-## Mental model
+## 心智模型
 
-`/goal` is a **contract enforcer with a verification loop**, not a "run forever" button. The shift: stop writing prompts, start writing **specifications with stop conditions**. Spend the time upfront defining "done"; the run takes care of itself.
+`/goal` 是一个**带验证循环的契约执行器**，不是“永远运行”按钮。关键转变是：停止写提示，开始写**带停止条件的规格说明**。把时间花在前期定义“完成”上；后续运行会自行推进。
