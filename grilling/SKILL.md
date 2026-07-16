@@ -1,12 +1,23 @@
 ---
 name: grilling
-description: Grill the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.
+description: 在实现前对计划或设计做高强度决策访谈。用于用户要求 grill、grilling、压力测试方案，或希望逐项对齐产品与架构决策时。
 ---
 
-Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
+# Grilling
 
-Ask the questions one at a time, waiting for feedback on each question before continuing. Asking multiple questions at once is bewildering.
+彻底检验计划，但目标是关闭**产品与架构决策空间**，不是穷举所有想象得到的实现分支。
 
-If a *fact* can be found by exploring the codebase, look it up rather than asking me. The *decisions*, though, are mine — put each one to me and wait for my answer.
+提出问题前，先分类：
 
-Do not enact the plan until I confirm we have reached a shared understanding.
+- **可查事实**：通过代码、文档或外部事实自行查明，不询问用户。
+- **产品或架构决策**：会改变用户可见契约、能力边界、所有权或长期演进方向，逐项交给用户决定。
+- **实现不变量**：由已确认设计和代码库约束推导，自行处理并记录，不把它伪装成产品选择。
+- **推测性加固**：只针对违反明确契约的调用、无法通过受支持入口产生的输入或极低概率假设；默认不升级为规格。
+
+任何边界情况进入规格前，先证明它能通过受支持的生产入口到达，或属于安全、数据损坏等必须防守的边界。若无真实路径，优先让类型、API 或所有权模型使非法状态不可表达；不要通过继续增加状态、分支和测试来承诺支持它。
+
+每次只问一个问题，给出推荐答案、理由和关键取舍，并等待反馈。维护简洁的决策账本，区分已接受、已拒绝、已延后和可由实现自行解决的事项；定期说明还剩多少个真正需要用户决定的问题。
+
+准备结束访谈前，做一次**组合复杂度审计**：汇总所有已接受能力将引入的概念、涉及的模块与接口、相互作用和异常处理，并估算实现与验证的大致量级。单项决定分别合理，不代表组合后的方案仍然合理；若明显超出最初范围，重新讨论能力删减或设计边界，不要把逐项“同意”直接当成整体实现授权。
+
+当剩余问题都能由代码库事实或已确认原则推导，且组合复杂度可接受时，停止访谈并总结权威决策、非目标和仍需验证的假设。只有在用户确认达成共识后，才开始实施。
