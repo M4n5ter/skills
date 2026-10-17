@@ -18,7 +18,7 @@ description: 使用 24 条工程原则指导代码设计、重构、迁移、调
 
 - **[懒惰协议（Laziness Protocol）](references/laziness-protocol.md)**：重构、评估差异规模，或想增加抽象、层次、信号传递时。倾向删除，以及能解决问题的最小改动。
 - **[基础性思考（Foundational Thinking）](references/foundational-thinking.md)**：编写逻辑之前：核心类型和数据结构、基础设施与功能的顺序、并发参与者共享什么。
-- **[从第一性原理重新设计（Redesign from First Principles）](references/redesign-from-first-principles.md)**：把新需求整合进现有设计时。重新设计，就像它从第一天起就是基础需求。
+- **[从第一性原理重新设计（Redesign from First Principles）](references/redesign-from-first-principles.md)**：把新需求整合进现有设计，或同类需求不断增加特殊分支时。重新设计，就像它从第一天起就是基础需求。
 - **[质疑前提（Attack the Premise）](references/attack-the-premise.md)**：两个或更多共享同一前提的修复均未通过同一检验时。先普查哪些参与者承载失衡，再质疑前提，不要继续写依赖它的修复。
 - **[先减后加（Subtract Before You Add）](references/subtract-before-you-add.md)**：安排新增、重构或重写的顺序时。先移除负担，再在更简单的基础上构建。
 - **[降低阅读者负担（Minimize Reader Load）](references/minimize-reader-load.md)**：审阅或塑造难以追踪的代码时。计算层次和隐藏状态，合并单一调用方的包装层，缩小可变状态作用域。
